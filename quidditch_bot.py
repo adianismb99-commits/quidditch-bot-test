@@ -280,38 +280,64 @@ async def manejar_mensajes(update, context):
             )
             return
         
-        # Esperando confirmación "si"
+                # Esperando confirmación "si"
         if context.user_data.get('guardian_esperando_listo'):
             if mensaje.lower() == 'si':
                 context.user_data['guardian_esperando_listo'] = False
                 context.user_data['guardian_esperando_defensa'] = True
                 
                 # Generar primer disparo
-                casa, aro, numeros = generar_disparo_aleatorio()  # casa = "🤍"
+                casa, aro, numeros = generar_disparo_aleatorio()
                 context.user_data['disparo_actual'] = {'casa': casa, 'aro': aro, 'numeros': numeros}
                 context.user_data['defensa_correcta'] = ''.join([defensa_numero(n) for n in numeros])
+                emblema_usuario = context.user_data.get('emblema_usuario', '❤️')
                 
-                # Mostrar tabla de conversión completa
-                tabla = "(2️⃣5️⃣1️⃣) → ⬅️\n(8️⃣9️⃣3️⃣) → ⬆️\n(7️⃣4️⃣6️⃣) → ➡️"
-                      
+                # Mostrar el disparo
                 await update.message.reply_text(
                     f"⚡ *¡PRIMER DISPARO!* ⚡\n\n"
                     f"`{casa}🏉{aro}{numeros}`\n\n"
                     f"📊 *TABLA DE CONVERSIÓN:*\n"
-                    f"`{tabla}`\n\n"
+                    f"(2️⃣5️⃣1️⃣) → ⬅️\n(8️⃣9️⃣3️⃣) → ⬆️\n(7️⃣4️⃣6️⃣) → ➡️\n\n"
+                    f"🛡️ *Tienes 5 segundos para defender*\n\n"
                     f"📝 *Formato de defensa:*\n"
-                    f"`{emblema_usuario}🧹{aro}⬅️⬆️➡️`\n\n"
-                    f"🛡️ *Escribe tu defensa (usa solo flechas):*",
+                    f"`{emblema_usuario}🧹{aro}{defensa_correcta}`",
                     parse_mode="Markdown"
                 )
-            else:
-                await update.message.reply_text(
-                    f"🟡 *Esperando confirmación.*\n\n"
-                    f"Escribe *'si'* cuando estés listo.\n"
-                    f"Escribe *'salir'* para terminar.",
-                    parse_mode="Markdown"
-                )
-            return
+                
+                # Esperar respuesta con contador
+                respuesta = await esperar_respuesta_con_contador(update, context, 5)
+                
+                if respuesta is None:
+                    # Tiempo agotado
+                    fallos = context.user_data.get('guardian_fallos', 0) + 1
+                    context.user_data['guardian_fallos'] = fallos
+                    
+                    await update.message.reply_text(
+                        f"⏰ *¡TIEMPO AGOTADO!*\n\n"
+                        f"No respondiste a tiempo.\n"
+                        f"⚡ *¡GOL! +100 puntos*\n\n"
+                        f"📊 *Aciertos:* {context.user_data.get('guardian_aciertos', 0)} | *Fallos:* {fallos}",
+                        parse_mode="Markdown"
+                    )
+                    
+                    # Generar nuevo disparo
+                    casa, aro, numeros = generar_disparo_aleatorio()
+                    context.user_data['disparo_actual'] = {'casa': casa, 'aro': aro, 'numeros': numeros}
+                    context.user_data['defensa_correcta'] = ''.join([defensa_numero(n) for n in numeros])
+                    
+                    await update.message.reply_text(
+                        f"🔄 *NUEVO DISPARO:*\n\n"
+                        f"`{casa}🏉{aro}{numeros}`\n\n"
+                        f"📊 *TABLA DE CONVERSIÓN:*\n"
+                        f"(2️⃣5️⃣1️⃣) → ⬅️\n(8️⃣9️⃣3️⃣) → ⬆️\n(7️⃣4️⃣6️⃣) → ➡️\n\n"
+                        f"🛡️ *Escribe tu defensa:*",
+                        parse_mode="Markdown"
+                    )
+                    return
+                
+                # Procesar respuesta
+                mensaje = respuesta
+                
         
                 # Defendiendo disparo actual
         if context.user_data.get('guardian_esperando_defensa'):
