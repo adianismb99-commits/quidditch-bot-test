@@ -1429,6 +1429,7 @@ async def jugar(update, context):
 
 async def esperar_respuesta_con_contador(update, context, tiempo_limite=5):
     """Espera respuesta del usuario con un contador visual que se actualiza cada segundo"""
+    print("🟢 DEBUG: Función esperar_respuesta_con_contador iniciada")
     
     # Crear mensaje inicial con el contador
     mensaje_contador = await update.message.reply_text(
@@ -1437,8 +1438,25 @@ async def esperar_respuesta_con_contador(update, context, tiempo_limite=5):
         parse_mode="Markdown"
     )
     
+    # Variable para almacenar la respuesta
+    respuesta_usuario = None
+    
+    # Definir el callback que capturará la respuesta
+    def responder(update_cb, context_cb):
+        nonlocal respuesta_usuario
+        if respuesta_usuario is None:
+            respuesta_usuario = update_cb.message.text
+            print(f"🟢 DEBUG: Respuesta recibida: {respuesta_usuario}")
+    
+    # Registrar el manejador temporal
+    handler = MessageHandler(filters.TEXT & ~filters.COMMAND, responder)
+    context.application.add_handler(handler)
+    
     # Bucle para actualizar el contador cada segundo
     for segundos_restantes in range(tiempo_limite - 1, 0, -1):
+        if respuesta_usuario is not None:
+            # El usuario ya respondió, salir del bucle
+            break
         await asyncio.sleep(1)
         try:
             await mensaje_contador.edit_text(
@@ -1446,12 +1464,30 @@ async def esperar_respuesta_con_contador(update, context, tiempo_limite=5):
                 f"*Tiempo restante:* {segundos_restantes} segundos",
                 parse_mode="Markdown"
             )
-        except Exception:
-            # El mensaje ya no existe (probablemente el usuario respondió)
+        except Exception as e:
+            print(f"🟢 DEBUG: Error editando contador: {e}")
             break
     
-    # Esperar la respuesta del usuario
-    futuro = asyncio.Future()
+    # Esperar a que el usuario responda (con timeout)
+    for _ in range(tiempo_limite * 10):  # Esperar máximo tiempo_limite segundos
+        if respuesta_usuario is not None:
+            break
+        await asyncio.sleep(0.1)
+    
+    # Eliminar el manejador temporal
+    context.application.remove_handler(handler)
+    
+    # Eliminar el mensaje del contador
+    try:
+        await mensaje_contador.delete()
+    except:
+        pass
+    
+    if respuesta_usuario is None:
+        print("🟢 DEBUG: Tiempo agotado")
+        return None
+    
+    return respuesta_usuario
     
     def callback(update_cb, context_cb):
         if not futuro.done():
